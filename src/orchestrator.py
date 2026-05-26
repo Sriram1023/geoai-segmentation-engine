@@ -63,18 +63,49 @@ class GeoAIPipeline:
         return stitcher.get_final_mask()
 
 if __name__ == "__main__":
-    # Create a dummy image file to prevent FileNotFound validation errors during checking
-    with open("mock_image.tif", "w") as f:
-        f.write("mock content")
+    import os
+    import rasterio
+    from rasterio.transform import from_origin
 
-    pipeline = GeoAIPipeline()
-    final_output = pipeline.run_inference_pipeline(
-        image_path="mock_image.tif",
-        target_classes=["bunker", "tree"],
-        meta_override={"crs": "EPSG:4326", "bbox": [-80.1, 25.4, -80.0, 25.5]}
-    )
-    print(f"Final compiled matrix canvas shape: {final_output.shape}")
+    mock_filename = "mock_image.tif"
+    print(f"Generating valid synthetic binary geospatial asset: {mock_filename}...")
 
-    # Clean up local filesystem mock assets safely
-    if os.path.exists("mock_image.tif"):
-        os.remove("mock_image.tif")
+    # Define dimensions for a small, lightweight 512x512 mock image canvas
+    width, height = 512, 512
+    
+    # Construct a valid rasterio profile structure for a 3-channel RGB layout
+    mock_profile = {
+        "driver": "GTiff",
+        "dtype": "uint8",
+        "nodata": None,
+        "width": width,
+        "height": height,
+        "count": 3,
+        "crs": "EPSG:4326",
+        "transform": from_origin(-80.1234, 25.5678, 0.00001, 0.00001)
+    }
+
+    # Generate a dummy numpy array representing synthetic image channels (Bands, Height, Width)
+    # We will seed it with some mock values so our internal loops have data to manipulate
+    mock_rgb_data = np.zeros((3, height, width), dtype=np.uint8)
+    mock_rgb_data[1, :, :] = 150  # Inject strong green channel values to pass our internal filters safely
+
+    # Write the valid structural binary payload directly to your Windows disk
+    with rasterio.open(mock_filename, "w", **mock_profile) as dst:
+        dst.write(mock_rgb_data)
+    print("Synthetic spatial image successfully mounted to local filesystem.")
+
+    # Execute the master pipeline wrapper orchestration sequence
+    try:
+        pipeline = GeoAIPipeline()
+        final_output = pipeline.run_inference_pipeline(
+            image_path=mock_filename,
+            target_classes=["bunker", "tree"]
+        )
+        print(f"Success! Final compiled matrix canvas shape: {final_output.shape}")
+        
+    finally:
+        # Clean up the local filesystem mock assets safely after testing is done
+        if os.path.exists(mock_filename):
+            os.remove(mock_filename)
+            print(f"Temporary file {mock_filename} scrubbed from disk.")
